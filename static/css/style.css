@@ -76,3 +76,8 @@ body {
     color: var(--bs-secondary);
     opacity: 1;
 }
+
+#gene-match-summary thead input,
+#gene-match-summary thead input::placeholder {
+    font-weight: 400;
+}
