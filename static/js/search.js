@@ -186,6 +186,9 @@ async function updateMatches() {
         const data = await response.json();
 
         // Ignore responses for an outdated selection.
+        if (requestId !== matchRequest) return;
+
+        // Ignore responses for an outdated selection.
         $("#matching-genes").empty().append(
             $("<div>", {
                 class: "sticky-top text-center fw-bold p-2 border-bottom sticky-top",
