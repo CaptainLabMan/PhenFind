@@ -154,6 +154,7 @@ async function updateMatches() {
     const requestId = ++matchRequest;
     const minimum = document.getElementById("min-matches");
     const ids = getSelectedHpoIds();
+    $("#selected-terms-count").text(`Terms: ${ids.length}`);
     const panels = $("#matching-genes, #gene-match-summary, #genes-match-stats");
 
     panels.empty();
@@ -192,7 +193,7 @@ async function updateMatches() {
         $("#matching-genes").empty().append(
             $("<div>", {
                 class: "sticky-top text-center fw-bold p-2 border-bottom sticky-top",
-                style: "background-color: #d1e7dd; color: #075a42;"
+                style: "background-color: #d1e7dd; color: #000;"
             }).append(
                 $("<span>", {
                     text: `Genes: ${data.genes.length}`
@@ -251,25 +252,97 @@ async function updateMatches() {
             "aria-label": "Search summary"
         });
 
+        // Read table contents once.
+        const summaryRows = [...summaryTable[0].querySelectorAll("tbody tr")].map(row => ({
+            element: row,
+            text: [...row.cells]
+                .map(cell => cell.textContent)
+                .join(" ")
+                .toLowerCase(),
+            genes: row.cells[0].textContent
+                .split(",")
+                .map(gene => gene.trim())
+                .filter(gene => gene && gene !== "—"),
+            visible: true
+        }));
+
+        let filteredGenes = [];
+
+        function filterSummary(query) {
+            const genes = new Set();
+
+            for (const row of summaryRows) {
+                const visible = row.text.includes(query);
+
+                // Update the DOM only when visibility changes.
+                if (visible !== row.visible) {
+                    row.element.style.display = visible ? "" : "none";
+                    row.visible = visible;
+                }
+
+                if (visible) {
+                    for (const gene of row.genes) {
+                        genes.add(gene);
+                    }
+                }
+            }
+
+            filteredGenes = [...genes];
+        }
+
+        function getFilteredGenes() {
+            return filteredGenes;
+        }
+
+        filterSummary("");
+
+        const summaryGenesCount = $("<span>", {
+            class: "text-nowrap flex-shrink-0",
+            text: `Genes: ${getFilteredGenes().length}`
+        });
+
+        const copySummaryGenes = $("<button>", {
+            type: "button",
+            class: "btn btn-sm bg-transparent border border-success rounded-4 flex-shrink-0",
+            style: "width: 65px;",
+            text: "Copy",
+            "aria-label": "Copy filtered genes"
+        }).on("click", async function () {
+            const genes = getFilteredGenes();
+
+            if (!genes.length) return;
+
+            try {
+                await navigator.clipboard.writeText(genes.join(", "));
+                $(this).text("Copied");
+                setTimeout(() => $(this).text("Copy"), 1500);
+            } catch (error) {
+                alert("Could not copy genes.");
+            }
+        });
+
         summaryTable.find("thead").prepend(
             $("<tr>").append(
                 $("<th>", {
                     colspan: summaryTable.find("thead tr").first().children().length,
                     class: "p-1"
-                }).append(searchInput)
+                }).append(
+                    $("<div>", {
+                        class: "d-flex align-items-center gap-2"
+                    }).append(
+                        searchInput.css("min-width", 0),
+                        summaryGenesCount,
+                        copySummaryGenes
+                    )
+                )
             )
         );
 
         searchInput.on("input", function () {
-            const query = this.value.trim().toLowerCase();
+            filterSummary(this.value.trim().toLowerCase());
 
-            summaryTable.find("tbody tr").each(function () {
-                const text = $(this).children("td").map(function () {
-                    return $(this).text();
-                }).get().join(" ").toLowerCase();
-
-                $(this).toggle(text.includes(query));
-            });
+            summaryGenesCount.text(`Genes: ${filteredGenes.length}`);
+            copySummaryGenes.prop("disabled", !filteredGenes.length);
         });
 
         if (mode === "disease") {
